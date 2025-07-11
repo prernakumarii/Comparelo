@@ -1,0 +1,119 @@
+# ✅ Step 1: Install packages
+!pip install flask pyngrok --quiet
+
+# ✅ Step 2: Setup folders
+import os
+
+os.makedirs('scrapers', exist_ok=True)
+os.makedirs('templates', exist_ok=True)
+
+# ✅ Step 3: Create scraper files
+with open('scrapers/amazon_scraper.py', 'w') as f:
+    f.write("""
+def get_amazon_data(product):
+    return [{
+        "name": f"{product} - Amazon",
+        "price": "₹999",
+        "rating": "4.5",
+        "url": "https://www.amazon.in"
+    }]
+""")
+
+with open('scrapers/flipkart_scraper.py', 'w') as f:
+    f.write("""
+def get_flipkart_data(product):
+    return [{
+        "name": f"{product} - Flipkart",
+        "price": "₹949",
+        "rating": "4.3",
+        "url": "https://www.flipkart.com"
+    }]
+""")
+
+with open('scrapers/myntra_scraper.py', 'w') as f:
+    f.write("""
+def get_myntra_data(product):
+    return [{
+        "name": f"{product} - Myntra",
+        "price": "₹999",
+        "rating": "4.2",
+        "url": "https://www.myntra.com"
+    }]
+""")
+
+# ✅ Step 4: Create HTML template
+with open('templates/index.html', 'w') as f:
+    f.write("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Comparelo</title>
+</head>
+<body>
+    <h2>Compare Products</h2>
+    <form action="/compare" method="post">
+        <input type="text" name="product" placeholder="Enter product name">
+        <button type="submit">Compare</button>
+    </form>
+</body>
+</html>
+""")
+
+# ✅ Step 5: Create app.py Flask backend
+with open('app.py', 'w') as f:
+    f.write("""
+from flask import Flask, request, render_template, jsonify
+from scrapers.amazon_scraper import get_amazon_data
+from scrapers.flipkart_scraper import get_flipkart_data
+from scrapers.myntra_scraper import get_myntra_data
+
+app = Flask(__name__)
+
+@app.route('/compare', methods=['POST'])
+def compare():
+    product_name = request.form.get('product')
+    if not product_name:
+        return "Product name required", 400
+
+    import pandas as pd
+
+    try:
+        df = pd.read_csv("/content/sample_products_large.csv")  # path to your new CSV
+    except FileNotFoundError:
+        return jsonify({"error": "Data file not found."}), 500
+
+    # Case-insensitive match for the product name
+    results = df[df["Product"].str.lower() == product_name.lower()].sort_values("Price")
+
+    if results.empty:
+        return jsonify({"message": "No results found for this product."})
+
+    return jsonify(results.to_dict(orient="records"))
+
+
+    results = []
+    results.extend(get_amazon_data(product_name))
+    results.extend(get_flipkart_data(product_name))
+    results.extend(get_myntra_data(product_name))
+    return jsonify(results)
+
+if __name__ == '__main__':
+    app.run()
+""")
+
+
+from pyngrok import ngrok, conf
+import threading
+import app  # assuming app.py is already created
+
+# 🔐 Set your ngrok auth token
+conf.get_default().auth_token = "2zTq2PYCqVCrfhX6tUKezIIr017_a3V5R7XJRWHuDUuvnvbe"  # replace this with your real token
+
+# 🌐 Expose Flask app on port 5000
+public_url = ngrok.connect(5000)
+print("🚀 Your public ngrok URL:", public_url)
+
+# ▶️ Start Flask in a separate thread
+threading.Thread(target=app.app.run).start()
+
+
